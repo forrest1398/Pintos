@@ -60,12 +60,13 @@ struct page {
     };
     struct hash_elem p_elem; /** Hash table element. */
     bool writable;
+    size_t sec_no;
 };
 
 /** PROJ 3 : Memory Management **/
 struct frame_table {
     struct list frames;
-    struct list_elem next_victim;
+    struct list_elem *next_victim;
     struct lock ft_lock;
 };
 
@@ -125,6 +126,8 @@ enum vm_type page_get_type(struct page *page);
 
 struct page *page_lookup(const void *address);
 void *page_killer(struct hash_elem *hash_elem, void *aux UNUSED);
+static struct frame *vm_get_frame(void);
+static struct frame *vm_evict_frame(void);
 /** end code - Memory MGMT */
 
 #endif /* VM_VM_H */

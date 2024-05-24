@@ -73,7 +73,6 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writabl
         struct page *new_page = (struct page *) calloc(1, sizeof(struct page));
         if (!new_page)
             return false;
-
         switch (VM_TYPE(type)) {
             case VM_ANON:
                 uninit_new(new_page, upage, init, type, aux, anon_initializer);
@@ -129,7 +128,26 @@ void spt_remove_page(struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *vm_get_victim(void) {
     struct frame *victim = NULL;
+    struct list_elem *e;
     /* TODO: The policy for eviction is up to you. */
+
+    if (!frame_table.next_victim)
+        frame_table.next_victim = list_begin(&frame_table.frames);
+
+    lock_acquire(&frame_table.ft_lock);
+    for (e = frame_table.next_victim; e != list_end(&frame_table.frames); e = list_next(e)) {
+        victim = list_entry(e, struct frame, f_elem);
+
+        if (!pml4_is_accessed(thread_current()->pml4, victim->page->va)) {
+            frame_table.next_victim = list_next(e);
+            list_remove(e);
+            lock_release(&frame_table.ft_lock);
+            return victim;
+        }
+
+        pml4_set_accessed(thread_current()->pml4, victim->kva, 0);
+    }
+    lock_release(&frame_table.ft_lock);
 
     return victim;
 }
@@ -137,10 +155,15 @@ static struct frame *vm_get_victim(void) {
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *vm_evict_frame(void) {
-    struct frame *victim UNUSED = vm_get_victim();
+    struct frame *victim = vm_get_victim();
     /* TODO: swap out the victim and return the evicted frame. */
 
-    return NULL;
+    if (!swap_out(victim->page))
+        return NULL;
+
+    memset(victim->kva, 0, PGSIZE);
+    victim->page = NULL;
+    return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -154,12 +177,16 @@ static struct frame *vm_get_frame(void) {
     /** PROJ 3 : Memory MGMT */
     frame = (struct frame *) calloc(1, sizeof(struct frame));
     frame->kva = palloc_get_page(PAL_USER | PAL_ZERO);
+    if (!frame->kva) {
+        frame = vm_evict_frame();  // TODO: PANIC~~~~~~~~~~~~~~~~!
+        frame->page = NULL;
+        return frame;
+    }
 
-    if (!frame->kva)
-        PANIC("\nTODOOOOOOOOOOOOOOOO~~~~\n");  // TODO: PANIC~~~~~~~~~~~~~~~~!
-
-    frame->page == NULL;
+    frame->page = NULL;
+    lock_acquire(&frame_table.ft_lock);
     list_push_back(&frame_table.frames, &frame->f_elem);
+    lock_release(&frame_table.ft_lock);
 
     /** end code - Memory MGMT */
 
@@ -194,17 +221,18 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED, bool us
     if (not_present) {
         void *rsp = user ? f->rsp : thread_current()->usb;
 
-        if (addr >= USER_STACK - USM_SIZE && (addr == rsp - 8 || addr == rsp)) {
+        if (addr >= USER_STACK - USM_SIZE && (addr >= rsp - 8) && (addr < USER_STACK)) {
             vm_stack_growth(pg_round_down(addr));
             return true;
         }
 
         page = spt_find_page(spt, addr);
-        if ((write == 1 && page->writable == 0) || !page)
+        if ((write == 1 && page->writable == 0) || !page) {
             return false;
-
+        }
         return vm_claim_page(addr);
     }
+
     return false;
 }
 
@@ -291,8 +319,9 @@ bool supplemental_page_table_copy(struct supplemental_page_table *child UNUSED,
 void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED) {
     /* TODO: Destroy all the supplemental_page_table hold by thread and
      * TODO: writeback all the modified contents to the storage. */
-
+    lock_acquire(&frame_table.ft_lock);
     hash_clear(&spt->spt_hash, page_killer);
+    lock_release(&frame_table.ft_lock);
 }
 
 /** PROJ 3 : Memory MGMT */
