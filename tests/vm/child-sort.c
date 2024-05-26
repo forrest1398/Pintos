@@ -37,6 +37,5 @@ main (int argc UNUSED, char *argv[])
   seek (handle, 0);
   write (handle, buf, size);
   close (handle);
-  
   return 123;
 }

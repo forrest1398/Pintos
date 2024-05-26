@@ -50,7 +50,6 @@ struct page {
 
     struct hash_elem p_elem; /** Hash table element. */
     bool writable;
-    size_t sec_no;
     // TODO: My implementation
     /* Per-type data are binded into the union.
      * Each function automatically detects the current union */

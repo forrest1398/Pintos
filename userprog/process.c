@@ -274,12 +274,11 @@ int process_wait(tid_t child_tid UNUSED) {
 
     sema_down(&child->wait_sema);  // 자식 프로세스가 종료될 때 까지 대기.
 
-    int exit_status = child->exit_status;
     list_remove(&child->child_elem);
 
     sema_up(&child->exit_sema);  // 자식 프로세스가 죽을 수 있도록 signal
 
-    return exit_status;
+    return child->exit_status;
 }
 
 /** #Project 2: System Call - Exit the process. This function is called by thread_exit (). */
@@ -762,6 +761,7 @@ static bool setup_stack(struct intr_frame *if_) {
     bool success = false;
     void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
     thread_current()->usb = stack_bottom;
+    
     /** PROJ 3 첫스택 지연할당 못함, stack 마킹 못함
      * 스택 확인 못하면 첫스택인지 아닌지 몰라요~
      * 스택확인은 thread 구조체에 stack_bottom 멤버 추가해서 할수있음 */

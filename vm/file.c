@@ -61,6 +61,7 @@ static bool file_backed_swap_in(struct page *page, void *kva) {
 
 /* Swap out the page by writeback contents to the file. */
 static bool file_backed_swap_out(struct page *page) {
+    printf("file swap out !!!\n");
     struct file_page *file_page UNUSED = &page->file;
     struct vm_aux *vm_aux = file_page->vm_aux;
 
@@ -102,6 +103,7 @@ static void file_backed_destroy(struct page *page) {
 /* Do the mmap */
 void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t offset) {
     uint8_t *d_addr = addr;
+    lock_acquire(&filesys_lock);
     struct file *re_file = file_reopen(file);
     if (!re_file)
         return false;
@@ -121,9 +123,10 @@ void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
         if (!vm_alloc_page_with_initializer(VM_FILE, d_addr, writable, lazy_load_segment,
                                             (void *) vm_aux)) {
-            // free(vm_aux);
+            free(vm_aux);
             // #Q. 이거 터트려도 대나
-            return NULL;
+            lock_release(&filesys_lock);
+            return NULL;   
         }
 
         /* Advance. */
@@ -133,6 +136,7 @@ void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t 
 
         d_addr += PGSIZE;
     }
+    lock_release(&filesys_lock);
     return addr;
 }
 

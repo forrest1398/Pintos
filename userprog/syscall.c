@@ -122,15 +122,16 @@ void syscall_handler(struct intr_frame *f UNUSED) {
 struct page *check_address(void *addr) {
     thread_t *curr = thread_current();
 
-    if (is_kernel_vaddr(addr) || addr == NULL)
+    if (is_kernel_vaddr(addr) || addr == NULL) {
         exit(-1);
+    }
 
     return spt_find_page(&curr->spt, addr);
 }
 
 /** Project 3: Memory Mapped Files - 버퍼 유효성 검사 */
 void check_valid_buffer(void *buffer, size_t size, bool writable) {
-    for (size_t i = 0; i < size * 3; i++) {
+    for (size_t i = 0; i < size ; i++) {
         /* buffer가 spt에 존재하는지 검사 */
         struct page *page = check_address(buffer + i);
 
@@ -230,6 +231,8 @@ int filesize(int fd) {
 
 int read(int fd, void *buffer, unsigned length) {
     check_valid_buffer(buffer, length, true);
+    check_valid_buffer(buffer, length, true);
+    check_valid_buffer(buffer, length, true);
     check_address(buffer);
 
     thread_t *curr = thread_current();
@@ -269,7 +272,9 @@ int read(int fd, void *buffer, unsigned length) {
 }
 
 int write(int fd, const void *buffer, unsigned length) {
-    check_valid_buffer(buffer, length, true);
+    check_valid_buffer(buffer, length, false);
+    check_valid_buffer(buffer, length, false);
+    check_valid_buffer(buffer, length, false);
     check_address(buffer);
 
     thread_t *curr = thread_current();
