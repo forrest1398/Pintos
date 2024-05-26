@@ -22,19 +22,21 @@ static const struct page_operations anon_ops = {
 };
 
 /* Initialize the data for anonymous pages */
-void vm_anon_init(void) {
+void vm_anon_init(void)
+{
     /* TODO: Set up the swap_disk. */
     swap_disk = disk_get(1, 1);
-    bitmap = bitmap_create(disk_size(swap_disk) / (PGSIZE / DISK_SECTOR_SIZE));  // 7560개
+    bitmap = bitmap_create(disk_size(swap_disk) / (PGSIZE / DISK_SECTOR_SIZE)); // 7560개
     lock_init(&anon_lock);
 }
 
 /* Initialize the file mapping */
-bool anon_initializer(struct page *page, enum vm_type type, void *kva) {
+bool anon_initializer(struct page *page, enum vm_type type, void *kva)
+{
     /* Set up the handler */
     page->operations = &anon_ops;
     struct anon_page *anon_page = &page->anon;
-    anon_page->sec_no = -1;
+    // anon_page->sec_no = -1;
 
     return true;
 }
@@ -44,14 +46,16 @@ bool anon_initializer(struct page *page, enum vm_type type, void *kva) {
 스왑 아웃 될 때 페이지 구조체는 스왑 디스크에 저장되어 있어야 합니다.
 스왑 테이블을 업데이트해야 합니다(스왑 테이블 관리 참조).
 */
-static bool anon_swap_in(struct page *page, void *kva) {
-    printf("anony swap in!!!\n");
+static bool anon_swap_in(struct page *page, void *kva)
+{
+    // printf("anony swap in!!!\n");
     struct anon_page *anon_page = &page->anon;
     disk_sector_t sec_no = anon_page->sec_no;
-    lock_acquire(&anon_lock);
-    if (!bitmap_test(bitmap, sec_no))
-        return NULL;
-    lock_release(&anon_lock);
+    // lock_acquire(&anon_lock);
+    // // printf("sec_no : %d\n", sec_no);
+    // if (!bitmap_test(bitmap, sec_no))
+    //     return NULL;
+    // lock_release(&anon_lock);
 
     for (int i = 0; i < 8; i++)
         disk_read(swap_disk, sec_no * 8 + i, kva + DISK_SECTOR_SIZE * i);
@@ -69,8 +73,9 @@ static bool anon_swap_in(struct page *page, void *kva) {
 위치는 페이지 구조체에 저장되어야 합니다. 디스크에 사용 가능한 슬롯이 더 이상 없으면 커널 패닉이
 발생할 수 있습니다.
  */
-static bool anon_swap_out(struct page *page) {
-    printf("anony swap out!!!\n");
+static bool anon_swap_out(struct page *page)
+{
+    // printf("anony swap out!!!\n");
     struct anon_page *anon_page = &page->anon;
     // return true;
     lock_acquire(&anon_lock);
@@ -80,28 +85,31 @@ static bool anon_swap_out(struct page *page) {
         return false;
     disk_sector_t sec_no = sec_num;
 
-    for (int i = 0; i < 8; i++) {
-        disk_write(swap_disk, sec_no * 8 + i, page->va + DISK_SECTOR_SIZE * i);
-        printf("이게 아이다 %d\n", i);
-        printf("이게 섹넘이다 %d\n", sec_no * 8 + i);
-        printf("여기에 이만큼 쓴다 %p\n", page->va + DISK_SECTOR_SIZE * i);
-        printf("이게 페이지 va다 %p\n", page->va);
+    for (int i = 0; i < 8; i++)
+    {
+        disk_write(swap_disk, sec_no * 8 + i, page->frame->kva + DISK_SECTOR_SIZE * i);
+        // printf("이게 아이다 %d\n", i);
+        // printf("이게 섹넘이다 %d\n", sec_no * 8 + i);
+        // printf("여기에 이만큼 쓴다 %p\n", page->va + DISK_SECTOR_SIZE * i);
+        // printf("이게 페이지 va다 %p\n", page->va);
     }
 
     anon_page->sec_no = sec_no;
     page->frame = NULL;
 
-    pml4_clear_page(thread_current()->pml4, page->va);
+    // pml4_clear_page(thread_current()->pml4, page->va);
     return true;
 }
 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
-static void anon_destroy(struct page *page) {
+static void anon_destroy(struct page *page)
+{
     struct anon_page *anon_page = &page->anon;
     if (!anon_page->sec_no)
         bitmap_reset(bitmap, anon_page->sec_no);
 
-    if (page->frame) {
+    if (page->frame)
+    {
         lock_acquire(&anon_lock);
         list_remove(&page->frame->f_elem);
         lock_release(&anon_lock);
@@ -110,5 +118,5 @@ static void anon_destroy(struct page *page) {
         page->frame = NULL;
     }
 
-    pml4_clear_page(thread_current()->pml4, page->va);
+    // pml4_clear_page(thread_current()->pml4, page->va);
 }

@@ -26,7 +26,7 @@ void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
 
 /** #Project 2: System Call */
-struct lock filesys_lock;  // 파일 읽기/쓰기 용 lock
+struct lock filesys_lock; // 파일 읽기/쓰기 용 lock
 
 /* System call.
  *
@@ -37,13 +37,14 @@ struct lock filesys_lock;  // 파일 읽기/쓰기 용 lock
  * The syscall instruction works by reading the values from the the Model
  * Specific Register (MSR). For the details, see the manual. */
 
-#define MSR_STAR         0xc0000081 /* Segment selector msr */
-#define MSR_LSTAR        0xc0000082 /* Long mode SYSCALL target */
+#define MSR_STAR 0xc0000081         /* Segment selector msr */
+#define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-void syscall_init(void) {
-    write_msr(MSR_STAR, ((uint64_t) SEL_UCSEG - 0x10) << 48 | ((uint64_t) SEL_KCSEG) << 32);
-    write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
+void syscall_init(void)
+{
+    write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 | ((uint64_t)SEL_KCSEG) << 32);
+    write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
 
     /* The interrupt service rountine should not serve any interrupts
      * until the syscall_entry swaps the userland stack to the kernel
@@ -56,73 +57,77 @@ void syscall_init(void) {
 
 /* The main system call interface */
 /** #Project 2: System Call - 시스템 콜 핸들러 */
-void syscall_handler(struct intr_frame *f UNUSED) {
+void syscall_handler(struct intr_frame *f UNUSED)
+{
     // TODO: Your implementation goes here.
     int sys_number = f->R.rax;
 
     // Argument 순서
     // %rdi %rsi %rdx %r10 %r8 %r9
 
-    switch (sys_number) {
-        case SYS_HALT:
-            halt();
-            break;
-        case SYS_EXIT:
-            exit(f->R.rdi);
-            break;
-        case SYS_FORK:
-            f->R.rax = fork(f->R.rdi);
-            break;
-        case SYS_EXEC:
-            f->R.rax = exec(f->R.rdi);
-            break;
-        case SYS_WAIT:
-            f->R.rax = process_wait(f->R.rdi);
-            break;
-        case SYS_CREATE:
-            f->R.rax = create(f->R.rdi, f->R.rsi);
-            break;
-        case SYS_REMOVE:
-            f->R.rax = remove(f->R.rdi);
-            break;
-        case SYS_OPEN:
-            f->R.rax = open(f->R.rdi);
-            break;
-        case SYS_FILESIZE:
-            f->R.rax = filesize(f->R.rdi);
-            break;
-        case SYS_READ:
-            f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
-            break;
-        case SYS_WRITE:
-            f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
-            break;
-        case SYS_SEEK:
-            seek(f->R.rdi, f->R.rsi);
-            break;
-        case SYS_TELL:
-            f->R.rax = tell(f->R.rdi);
-            break;
-        case SYS_CLOSE:
-            close(f->R.rdi);
-            break;
-        case SYS_DUP2:
-            f->R.rax = dup2(f->R.rdi, f->R.rsi);
-            break;
-        case SYS_MMAP:
-            f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
-            break;
-        case SYS_MUNMAP:
-            munmap(f->R.rdi);
-            break;
-        default:
-            return;
+    switch (sys_number)
+    {
+    case SYS_HALT:
+        halt();
+        break;
+    case SYS_EXIT:
+        exit(f->R.rdi);
+        break;
+    case SYS_FORK:
+        f->R.rax = fork(f->R.rdi);
+        break;
+    case SYS_EXEC:
+        f->R.rax = exec(f->R.rdi);
+        break;
+    case SYS_WAIT:
+        f->R.rax = process_wait(f->R.rdi);
+        break;
+    case SYS_CREATE:
+        f->R.rax = create(f->R.rdi, f->R.rsi);
+        break;
+    case SYS_REMOVE:
+        f->R.rax = remove(f->R.rdi);
+        break;
+    case SYS_OPEN:
+        f->R.rax = open(f->R.rdi);
+        break;
+    case SYS_FILESIZE:
+        f->R.rax = filesize(f->R.rdi);
+        break;
+    case SYS_READ:
+        f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+        break;
+    case SYS_WRITE:
+        f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+        break;
+    case SYS_SEEK:
+        seek(f->R.rdi, f->R.rsi);
+        break;
+    case SYS_TELL:
+        f->R.rax = tell(f->R.rdi);
+        break;
+    case SYS_CLOSE:
+        close(f->R.rdi);
+        break;
+    case SYS_DUP2:
+        f->R.rax = dup2(f->R.rdi, f->R.rsi);
+        break;
+    case SYS_MMAP:
+        f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+        break;
+    case SYS_MUNMAP:
+        munmap(f->R.rdi);
+        break;
+    default:
+        return;
     }
 }
-struct page *check_address(void *addr) {
+struct page *check_address(void *addr)
+{
     thread_t *curr = thread_current();
 
-    if (is_kernel_vaddr(addr) || addr == NULL) {
+    if (is_kernel_vaddr(addr) || addr == NULL)
+    {
         exit(-1);
     }
 
@@ -130,8 +135,10 @@ struct page *check_address(void *addr) {
 }
 
 /** Project 3: Memory Mapped Files - 버퍼 유효성 검사 */
-void check_valid_buffer(void *buffer, size_t size, bool writable) {
-    for (size_t i = 0; i < size ; i++) {
+void check_valid_buffer(void *buffer, size_t size, bool writable)
+{
+    for (size_t i = 0; i < size; i++)
+    {
         /* buffer가 spt에 존재하는지 검사 */
         struct page *page = check_address(buffer + i);
 
@@ -140,11 +147,13 @@ void check_valid_buffer(void *buffer, size_t size, bool writable) {
     }
 }
 
-void halt(void) {
+void halt(void)
+{
     power_off();
 }
 
-void exit(int status) {
+void exit(int status)
+{
     thread_t *curr = thread_current();
     curr->exit_status = status;
 
@@ -154,13 +163,16 @@ void exit(int status) {
     thread_exit();
 }
 
-pid_t fork(const char *thread_name) {
+pid_t fork(const char *thread_name)
+{
     check_address(thread_name);
+    // printf("----------------------\n");
 
     return process_fork(thread_name, NULL);
 }
 
-int exec(const char *cmd_line) {
+int exec(const char *cmd_line)
+{
     check_address(cmd_line);
 
     off_t size = strlen(cmd_line) + 1;
@@ -174,14 +186,16 @@ int exec(const char *cmd_line) {
     if (process_exec(cmd_copy) == -1)
         return -1;
 
-    return 0;  // process_exec 성공시 리턴 값 없음 (do_iret)
+    return 0; // process_exec 성공시 리턴 값 없음 (do_iret)
 }
 
-int wait(pid_t tid) {
+int wait(pid_t tid)
+{
     return process_wait(tid);
 }
 
-bool create(const char *file, unsigned initial_size) {
+bool create(const char *file, unsigned initial_size)
+{
     check_address(file);
 
     lock_acquire(&filesys_lock);
@@ -191,7 +205,8 @@ bool create(const char *file, unsigned initial_size) {
     return file_succ;
 }
 
-bool remove(const char *file) {
+bool remove(const char *file)
+{
     check_address(file);
 
     lock_acquire(&filesys_lock);
@@ -201,14 +216,16 @@ bool remove(const char *file) {
     return file_succ;
 }
 
-int open(const char *file) {
+int open(const char *file)
+{
     check_address(file);
 
     lock_acquire(&filesys_lock);
     struct file *newfile = filesys_open(file);
     lock_release(&filesys_lock);
 
-    if (newfile == NULL) {
+    if (newfile == NULL)
+    {
         return -1;
     }
 
@@ -220,7 +237,8 @@ int open(const char *file) {
     return fd;
 }
 
-int filesize(int fd) {
+int filesize(int fd)
+{
     struct file *file = process_get_file(fd);
 
     if (file == NULL)
@@ -229,7 +247,8 @@ int filesize(int fd) {
     return file_length(file);
 }
 
-int read(int fd, void *buffer, unsigned length) {
+int read(int fd, void *buffer, unsigned length)
+{
     check_valid_buffer(buffer, length, true);
     check_valid_buffer(buffer, length, true);
     check_valid_buffer(buffer, length, true);
@@ -238,20 +257,21 @@ int read(int fd, void *buffer, unsigned length) {
     thread_t *curr = thread_current();
     struct file *file = process_get_file(fd);
 
-    if (file == NULL || file == STDOUT
-        || file == STDERR)  // 빈 파일, stdout, stderr를 읽으려고 할 경우
+    if (file == NULL || file == STDOUT || file == STDERR) // 빈 파일, stdout, stderr를 읽으려고 할 경우
         return -1;
 
     struct page *page = spt_find_page(&thread_current()->spt, buffer);
     if (!page->writable)
         exit(-1);
 
-    if (file == STDIN) {  // stdin -> console로 직접 입력
-        int i = 0;        // 쓰레기 값 return 방지
+    if (file == STDIN)
+    {              // stdin -> console로 직접 입력
+        int i = 0; // 쓰레기 값 return 방지
         char c;
         unsigned char *buf = buffer;
 
-        for (; i < length; i++) {
+        for (; i < length; i++)
+        {
             c = input_getc();
             *buf++ = c;
             if (c == '\0')
@@ -271,7 +291,8 @@ int read(int fd, void *buffer, unsigned length) {
     return bytes;
 }
 
-int write(int fd, const void *buffer, unsigned length) {
+int write(int fd, const void *buffer, unsigned length)
+{
     check_valid_buffer(buffer, length, false);
     check_valid_buffer(buffer, length, false);
     check_valid_buffer(buffer, length, false);
@@ -283,13 +304,14 @@ int write(int fd, const void *buffer, unsigned length) {
     lock_acquire(&filesys_lock);
     struct file *file = process_get_file(fd);
 
-    if (file == STDIN || file == NULL)  // stdin에 쓰려고 할 경우
+    if (file == STDIN || file == NULL) // stdin에 쓰려고 할 경우
     {
         lock_release(&filesys_lock);
         return -1;
     }
 
-    if (file == STDOUT || file == STDERR) {  // 1(stdout) & 2(stderr) -> console로 출력
+    if (file == STDOUT || file == STDERR)
+    { // 1(stdout) & 2(stderr) -> console로 출력
         putbuf(buffer, length);
         lock_release(&filesys_lock);
         return length;
@@ -301,7 +323,8 @@ int write(int fd, const void *buffer, unsigned length) {
     return bytes;
 }
 
-void seek(int fd, unsigned position) {
+void seek(int fd, unsigned position)
+{
     struct file *file = process_get_file(fd);
 
     if (file == NULL || (file >= STDIN && file <= STDERR))
@@ -310,7 +333,8 @@ void seek(int fd, unsigned position) {
     file_seek(file, position);
 }
 
-int tell(int fd) {
+int tell(int fd)
+{
     struct file *file = process_get_file(fd);
 
     if (file == NULL || (file >= STDIN && file <= STDERR))
@@ -319,7 +343,8 @@ int tell(int fd) {
     return file_tell(file);
 }
 
-void close(int fd) {
+void close(int fd)
+{
     thread_t *curr = thread_current();
     struct file *file = process_get_file(fd);
 
@@ -327,17 +352,20 @@ void close(int fd) {
         return;
     process_close_file(fd);
 
-    if (file == STDIN) {
+    if (file == STDIN)
+    {
         file = 0;
         return;
     }
 
-    if (file == STDOUT) {
+    if (file == STDOUT)
+    {
         file = 0;
         return;
     }
 
-    if (file == STDERR) {
+    if (file == STDERR)
+    {
         file = 0;
         return;
     }
@@ -349,7 +377,8 @@ void close(int fd) {
 }
 
 /** #Project 2: Extend File Descriptor (Extra) */
-int dup2(int oldfd, int newfd) {
+int dup2(int oldfd, int newfd)
+{
     struct file *oldfile = process_get_file(oldfd);
     struct file *newfile = process_get_file(newfd);
 
@@ -370,11 +399,12 @@ int dup2(int oldfd, int newfd) {
 }
 
 /** PROJ 3 : M-mapped filed*/
-void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) {
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset)
+{
     if (fd < 3 || addr == NULL || is_kernel_vaddr(addr))
         return NULL;
 
-    if (offset > PGSIZE || (int) length <= 0 || ((unsigned long) addr % PGSIZE))
+    if (offset > PGSIZE || (int)length <= 0 || ((unsigned long)addr % PGSIZE))
         return NULL;
 
     if (spt_find_page(&thread_current()->spt, addr))
@@ -385,11 +415,12 @@ void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) {
     if (filesize(file) == 0 || !file)
         return NULL;
 
-    return do_mmap(addr, length, writable, file, offset);
+    return do_mmap(addr, length, writable, file_reopen(file), offset);
 }
 
-void munmap(void *addr) {
-    if (((unsigned long) addr % PGSIZE) || addr == NULL)
+void munmap(void *addr)
+{
+    if (((unsigned long)addr % PGSIZE) || addr == NULL)
         return NULL;
 
     struct page *page = spt_find_page(&thread_current()->spt, addr);
