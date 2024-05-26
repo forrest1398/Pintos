@@ -39,7 +39,6 @@ bool anon_initializer(struct page *page, enum vm_type type, void *kva) {
     return true;
 }
 
-
 /* Swap in the page by read contents from the swap disk.
 🐬 스왑 디스크 데이터 내용을 읽어서 익명 페이지를(디스크에서 메모리로) swap in합니다.
 스왑 아웃 될 때 페이지 구조체는 스왑 디스크에 저장되어 있어야 합니다.
@@ -52,11 +51,10 @@ static bool anon_swap_in(struct page *page, void *kva) {
 
     if (!bitmap_test(bitmap, sec_no))
         return NULL;
-    lock_acquire(&anon_lock);
+
     for (int i = 0; i < 8; i++)
         disk_read(swap_disk, sec_no * 8 + i, kva + DISK_SECTOR_SIZE * i);
 
-    lock_release(&anon_lock);
     bitmap_set(bitmap, sec_no, 0);
 
     return true;
@@ -75,11 +73,9 @@ static bool anon_swap_out(struct page *page) {
     if (sec_num == BITMAP_ERROR)
         return false;
     disk_sector_t sec_no = sec_num;
-    lock_acquire(&anon_lock);
 
     for (int i = 0; i < 8; i++)
         disk_write(swap_disk, sec_no * 8 + i, page->va + DISK_SECTOR_SIZE * i);
-    lock_release(&anon_lock);
 
     bitmap_set(bitmap, sec_num, 1);
 
@@ -93,9 +89,17 @@ static bool anon_swap_out(struct page *page) {
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
 static void anon_destroy(struct page *page) {
     struct anon_page *anon_page = &page->anon;
-    list_remove(&page->frame->f_elem);
-    hash_delete(&thread_current()->spt.spt_hash, &page->p_elem);
+    if (!page->sec_no)
+        bitmap_reset(bitmap, page->sec_no);
+
+    if (page->frame) {
+        lock_acquire(&anon_lock);
+        list_remove(&page->frame->f_elem);
+        lock_release(&anon_lock);
+        page->frame->page = NULL;
+        free(page->frame);
+        page->frame = NULL;
+    }
+
     pml4_clear_page(thread_current()->pml4, page->va);
-    page->frame->page = NULL;
-    page->frame = NULL;
 }

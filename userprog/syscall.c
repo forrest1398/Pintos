@@ -116,14 +116,27 @@ void syscall_handler(struct intr_frame *f UNUSED) {
             munmap(f->R.rdi);
             break;
         default:
-            exit(-1);
+            return;
     }
 }
+struct page *check_address(void *addr) {
+    thread_t *curr = thread_current();
 
-void check_address(void *addr) {
-    if (is_kernel_vaddr(addr) || addr == NULL
-        || spt_find_page(&thread_current()->spt, addr) == NULL)
+    if (is_kernel_vaddr(addr) || addr == NULL)
         exit(-1);
+
+    return spt_find_page(&curr->spt, addr);
+}
+
+/** Project 3: Memory Mapped Files - 버퍼 유효성 검사 */
+void check_valid_buffer(void *buffer, size_t size, bool writable) {
+    for (size_t i = 0; i < size * 3; i++) {
+        /* buffer가 spt에 존재하는지 검사 */
+        struct page *page = check_address(buffer + i);
+
+        if (!page || (writable && !(page->writable)))
+            exit(-1);
+    }
 }
 
 void halt(void) {
@@ -192,9 +205,9 @@ int open(const char *file) {
 
     lock_acquire(&filesys_lock);
     struct file *newfile = filesys_open(file);
+    lock_release(&filesys_lock);
 
     if (newfile == NULL) {
-        lock_release(&filesys_lock);
         return -1;
     }
 
@@ -203,7 +216,6 @@ int open(const char *file) {
     if (fd == -1)
         file_close(newfile);
 
-    lock_release(&filesys_lock);
     return fd;
 }
 
@@ -217,6 +229,7 @@ int filesize(int fd) {
 }
 
 int read(int fd, void *buffer, unsigned length) {
+    check_valid_buffer(buffer, length, true);
     check_address(buffer);
 
     thread_t *curr = thread_current();
@@ -256,12 +269,13 @@ int read(int fd, void *buffer, unsigned length) {
 }
 
 int write(int fd, const void *buffer, unsigned length) {
+    check_valid_buffer(buffer, length, true);
     check_address(buffer);
-    lock_acquire(&filesys_lock);
 
     thread_t *curr = thread_current();
     off_t bytes = -1;
 
+    lock_acquire(&filesys_lock);
     struct file *file = process_get_file(fd);
 
     if (file == STDIN || file == NULL)  // stdin에 쓰려고 할 경우
@@ -306,7 +320,6 @@ void close(int fd) {
 
     if (file == NULL)
         return;
-
     process_close_file(fd);
 
     if (file == STDIN) {
@@ -364,7 +377,7 @@ void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) {
 
     struct file *file = process_get_file(fd);
 
-    if (filesize(file) == 0)
+    if (filesize(file) == 0 || !file)
         return NULL;
 
     return do_mmap(addr, length, writable, file, offset);

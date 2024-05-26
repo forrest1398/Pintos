@@ -46,7 +46,11 @@ struct page {
     const struct page_operations *operations;
     void *va;            /* Address in terms of user space */
     struct frame *frame; /* Back reference for frame */
-    /* Your implementation */
+                         /* Your implementation */
+
+    struct hash_elem p_elem; /** Hash table element. */
+    bool writable;
+    size_t sec_no;
     // TODO: My implementation
     /* Per-type data are binded into the union.
      * Each function automatically detects the current union */
@@ -58,9 +62,6 @@ struct page {
         struct page_cache page_cache;
 #endif
     };
-    struct hash_elem p_elem; /** Hash table element. */
-    bool writable;
-    size_t sec_no;
 };
 
 /** PROJ 3 : Memory Management **/

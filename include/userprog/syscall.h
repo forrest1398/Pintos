@@ -13,8 +13,8 @@ typedef int pid_t;
 #define READDIR_MAX_LEN 14
 
 /** #Project 2: System Call */
-void check_address(void *addr);
-
+struct page *check_address(void *addr);
+void check_valid_buffer(void *buffer, size_t size, bool writable);
 void halt(void);
 void exit(int status);
 pid_t fork(const char *thread_name);
@@ -36,7 +36,7 @@ int dup2(int oldfd, int newfd);
 
 /** PROJ 3 : M-mapped filed*/
 void *mmap(void *addr, size_t length, int writable, int fd, off_t offset);
-void munmap(void *addr );
+void munmap(void *addr);
 extern struct lock filesys_lock;
 /** end code - M-mapped filed */
 

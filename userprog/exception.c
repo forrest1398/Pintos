@@ -139,7 +139,6 @@ static void page_fault(struct intr_frame *f) {
     if (user)
         thread_current()->usb = pg_round_down(f->rsp);
 
-
     if (vm_try_handle_fault(f, fault_addr, user, write, not_present))
         return;
 #endif
@@ -151,8 +150,8 @@ static void page_fault(struct intr_frame *f) {
     위해서 exception을 수정해야함. */
 
     /* If the fault is true fault, show info and exit. */
-    printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
-           not_present ? "not present" : "rights violation", write ? "writing" : "reading",
-           user ? "user" : "kernel");
-    kill(f);
+    //  printf("Page fault at %p: %s error %s page in %s context.\n", fault_addr,
+    //         not_present ? "not present" : "rights violation", write ? "writing" : "reading",
+    //         user ? "user" : "kernel");
+    //  kill(f);
 }

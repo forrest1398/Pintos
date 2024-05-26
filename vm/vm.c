@@ -99,11 +99,16 @@ err:
 
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-    struct page *page = NULL;
     /* TODO: Fill this function. */
 
     /** PROJ 3 : Memory MGMT */
-    return page_lookup(va);
+    struct page *page = (struct page *) malloc(sizeof(struct page));
+    page->va = pg_round_down(va);
+    struct hash_elem *e = hash_find(&spt->spt_hash, &page->p_elem);
+
+    free(page);
+
+    return e != NULL ? hash_entry(e, struct page, p_elem) : NULL;
     /** end code - Memory MGMT*/
 }
 
@@ -126,32 +131,53 @@ void spt_remove_page(struct supplemental_page_table *spt, struct page *page) {
 }
 
 /* Get the struct frame, that will be evicted. */
+// static struct frame *vm_get_victim(void) {
+//     struct frame *victim = NULL;
+//     struct list_elem *e;
+//     /* TODO: The policy for eviction is up to you. */
+
+//     if (!frame_table.next_victim)
+//         frame_table.next_victim = list_begin(&frame_table.frames);
+
+//     lock_acquire(&frame_table.ft_lock);
+//     for (e = frame_table.next_victim; e != list_end(&frame_table.frames); e = list_next(e)) {
+//         victim = list_entry(e, struct frame, f_elem);
+
+//         if (!pml4_is_accessed(thread_current()->pml4, victim->page->va)) {
+//             frame_table.next_victim = list_next(e);
+//             list_remove(e);
+//             lock_release(&frame_table.ft_lock);
+//             return victim;
+//         }
+
+//         pml4_set_accessed(thread_current()->pml4, victim->kva, 0);
+//     }
+//     lock_release(&frame_table.ft_lock);
+//     return victim;
+// }
 static struct frame *vm_get_victim(void) {
     struct frame *victim = NULL;
-    struct list_elem *e;
     /* TODO: The policy for eviction is up to you. */
-
-    if (!frame_table.next_victim)
-        frame_table.next_victim = list_begin(&frame_table.frames);
+    struct thread *curr = thread_current();
 
     lock_acquire(&frame_table.ft_lock);
-    for (e = frame_table.next_victim; e != list_end(&frame_table.frames); e = list_next(e)) {
-        victim = list_entry(e, struct frame, f_elem);
-
-        if (!pml4_is_accessed(thread_current()->pml4, victim->page->va)) {
-            frame_table.next_victim = list_next(e);
-            list_remove(e);
+    struct list_elem *start = list_begin(&frame_table);
+    for (start; start != list_end(&frame_table); start = list_next(start)) {
+        victim = list_entry(start, struct frame, f_elem);
+        if (victim->page == NULL) {
             lock_release(&frame_table.ft_lock);
             return victim;
         }
-
-        pml4_set_accessed(thread_current()->pml4, victim->kva, 0);
+        if (pml4_is_accessed(curr->pml4, victim->page->va))
+            pml4_set_accessed(curr->pml4, victim->page->va, 0);
+        else {
+            lock_release(&frame_table.ft_lock);
+            return victim;
+        }
     }
     lock_release(&frame_table.ft_lock);
-
     return victim;
 }
-
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *vm_evict_frame(void) {
@@ -227,12 +253,12 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED, bool us
         }
 
         page = spt_find_page(spt, addr);
-        if ((write == 1 && page->writable == 0) || !page) {
+        if (!page)
             return false;
-        }
-        return vm_claim_page(addr);
+        if (write == 1 && page->writable == 0)
+            return false;
+        return vm_do_claim_page(page);
     }
-
     return false;
 }
 

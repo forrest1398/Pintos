@@ -27,16 +27,19 @@ void vm_file_init(void) {
 /* Initialize the file backed page */
 bool file_backed_initializer(struct page *page, enum vm_type type, void *kva) {
     /* Set up the handler */
-    page->operations = &file_ops;
 
     struct file_page *file_page = &page->file;
+    struct vm_aux *vm_aux = (struct vm_aux *) page->uninit.aux;
+    file_page->vm_aux = vm_aux;
+
+    page->operations = &file_ops;
 }
 #include <string.h>
 
 /* Swap in the page by read contents from the file. */
 static bool file_backed_swap_in(struct page *page, void *kva) {
     struct file_page *file_page UNUSED = &page->file;
-    struct vm_aux *vm_aux = page->uninit.aux;
+    struct vm_aux *vm_aux = file_page->vm_aux;
 
     struct file *file = vm_aux->file;
     off_t offset = vm_aux->ofs;
@@ -59,7 +62,7 @@ static bool file_backed_swap_in(struct page *page, void *kva) {
 /* Swap out the page by writeback contents to the file. */
 static bool file_backed_swap_out(struct page *page) {
     struct file_page *file_page UNUSED = &page->file;
-    struct vm_aux *vm_aux = (struct vm_aux *) page->uninit.aux;
+    struct vm_aux *vm_aux = file_page->vm_aux;
 
     if (!page)
         return false;
@@ -78,7 +81,8 @@ static bool file_backed_swap_out(struct page *page) {
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void file_backed_destroy(struct page *page) {
-    struct vm_aux *vm_aux = page->uninit.aux;
+    struct file_page *file_page UNUSED = &page->file;
+    struct vm_aux *vm_aux = file_page->vm_aux;
 
     if (pml4_is_dirty(thread_current()->pml4, page->va)) {
         file_write_at(vm_aux->file, page->va, vm_aux->page_read_bytes, vm_aux->ofs);
@@ -88,18 +92,16 @@ static void file_backed_destroy(struct page *page) {
     if (page->frame) {
         list_remove(&page->frame->f_elem);
         page->frame->page = NULL;
-        page->frame = NULL;
         free(page->frame);
+        page->frame = NULL;
     }
     pml4_clear_page(thread_current()->pml4, page->va);
-    // free(page);
     // #Q. 이거 터트려도 되나  free(page->uninit.aux);
 }
 
 /* Do the mmap */
 void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t offset) {
     uint8_t *d_addr = addr;
-    lock_acquire(&filesys_lock);
     struct file *re_file = file_reopen(file);
     if (!re_file)
         return false;
@@ -119,8 +121,8 @@ void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
         if (!vm_alloc_page_with_initializer(VM_FILE, d_addr, writable, lazy_load_segment,
                                             (void *) vm_aux)) {
-            lock_release(&filesys_lock);
-            // #Q. 이거 터트려도 대나 free(vm_aux);
+            // free(vm_aux);
+            // #Q. 이거 터트려도 대나
             return NULL;
         }
 
@@ -131,7 +133,6 @@ void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t 
 
         d_addr += PGSIZE;
     }
-    lock_release(&filesys_lock);
     return addr;
 }
 
@@ -141,7 +142,6 @@ void do_munmap(void *addr) {
     struct page *page = spt_find_page(&thread_current()->spt, d_addr);
     struct vm_aux *vm_aux = page->uninit.aux;
     struct file *orig_file = vm_aux->file;
-    lock_acquire(&filesys_lock);
     while (1) {
         page = spt_find_page(&thread_current()->spt, d_addr);
         if (!page)
@@ -149,13 +149,13 @@ void do_munmap(void *addr) {
 
         vm_aux = page->uninit.aux;
         struct file *next_file = vm_aux->file;
-        if (!next_file || next_file != orig_file)
+        if (!next_file || next_file != orig_file) {
             break;
-
-        destroy(page);
+        }
+        if (page)
+            destroy(page);
         d_addr += PGSIZE;
     }
-    free(page);
-    lock_release(&filesys_lock);
+    // free(page);
     return addr;
 }
